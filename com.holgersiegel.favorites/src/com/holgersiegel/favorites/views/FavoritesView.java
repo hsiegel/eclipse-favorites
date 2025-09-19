@@ -38,7 +38,7 @@ import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
-import org.eclipse.jface.viewers.IStructuredContentProvider;
+import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
@@ -180,16 +180,34 @@ public class FavoritesView extends ViewPart {
         }
     }
 
-    private static final class FavoritesContentProvider implements IStructuredContentProvider {
+    private static final class FavoritesContentProvider implements ITreeContentProvider {
         @Override
         public Object[] getElements(Object inputElement) {
-            if (inputElement instanceof FavoritesStore) {
-                return ((FavoritesStore) inputElement).getEntries().toArray();
+            return getChildren(inputElement);
+        }
+
+        @Override
+        public Object[] getChildren(Object parentElement) {
+            if (parentElement instanceof FavoritesStore) {
+                return ((FavoritesStore) parentElement).getEntries().toArray();
             }
-            if (inputElement instanceof java.util.Collection<?>) {
-                return ((java.util.Collection<?>) inputElement).toArray();
+            if (parentElement instanceof java.util.Collection<?>) {
+                return ((java.util.Collection<?>) parentElement).toArray();
             }
             return new Object[0];
+        }
+
+        @Override
+        public Object getParent(Object element) {
+            return null;
+        }
+
+        @Override
+        public boolean hasChildren(Object element) {
+            if (element instanceof FavoritesStore) {
+                return !((FavoritesStore) element).getEntries().isEmpty();
+            }
+            return false;
         }
 
         @Override
@@ -309,6 +327,7 @@ public class FavoritesView extends ViewPart {
         }
     }
 }
+
 
 
 
