@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feature
+      id="com.holgersiegel.favorites.feature"
+      label="Favorites Feature"
+      version="1.0.0.qualifier"
+      provider-name="Holger Siegel">
+
+   <description>
+      Favorites view feature providing a drag-and-drop enabled favorites tree.
+   </description>
+
+   <copyright>
+      MIT License
+   </copyright>
+
+   <license url="https://opensource.org/licenses/MIT">
+      MIT License
+   </license>
+
+   <plugin
+         id="com.holgersiegel.favorites"
+         download-size="0"
+         install-size="0"
+         version="0.0.0"
+         unpack="false"/>
+
+</feature>

@@ -1,0 +1,17 @@
+# Maven build outputs
+target/
+*/target/
+
+# Eclipse metadata
+.project
+.classpath
+.settings/
+bin/
+
+# IntelliJ IDEA metadata
+.idea/
+*.iml
+
+# OS artifacts
+.DS_Store
+Thumbs.db

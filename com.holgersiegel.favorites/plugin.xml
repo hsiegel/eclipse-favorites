@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+    <extension
+          point="org.eclipse.ui.views">
+        <category
+              id="com.holgersiegel.favorites.views.category"
+              name="General"/>
+        <view
+              id="com.holgersiegel.favorites.views.FavoritesView"
+              name="Favorites"
+              class="com.holgersiegel.favorites.views.FavoritesView"
+              category="com.holgersiegel.favorites.views.category"
+              allowMultiple="false"
+              restorable="true"/>
+    </extension>
+
+    <extension
+          point="org.eclipse.ui.commands">
+        <command
+              id="com.holgersiegel.favorites.commands.addCurrentEditor"
+              name="Add Current Editor to Favorites"
+              description="Add the file from the active editor to the favorites list."/>
+        <command
+              id="com.holgersiegel.favorites.commands.removeSelected"
+              name="Remove from Favorites"
+              description="Remove the selected entries from the favorites list."/>
+        <command
+              id="com.holgersiegel.favorites.commands.open"
+              name="Open Favorite"
+              description="Open the selected favorites in their default editor or reveal them."/>
+        <command
+              id="com.holgersiegel.favorites.commands.revealInPackageExplorer"
+              name="Reveal in Package Explorer"
+              description="Reveal the selected favorites in the Package Explorer."/>
+        <command
+              id="com.holgersiegel.favorites.commands.copyPath"
+              name="Copy Path"
+              description="Copy the absolute path of the selected favorites to the clipboard."/>
+    </extension>
+
+    <extension
+          point="org.eclipse.ui.handlers">
+        <handler
+              class="com.holgersiegel.favorites.handlers.AddCurrentEditorHandler"
+              commandId="com.holgersiegel.favorites.commands.addCurrentEditor"/>
+        <handler
+              class="com.holgersiegel.favorites.handlers.RemoveHandler"
+              commandId="com.holgersiegel.favorites.commands.removeSelected"/>
+        <handler
+              class="com.holgersiegel.favorites.handlers.OpenHandler"
+              commandId="com.holgersiegel.favorites.commands.open"/>
+        <handler
+              class="com.holgersiegel.favorites.handlers.RevealInExplorerHandler"
+              commandId="com.holgersiegel.favorites.commands.revealInPackageExplorer"/>
+        <handler
+              class="com.holgersiegel.favorites.handlers.CopyPathHandler"
+              commandId="com.holgersiegel.favorites.commands.copyPath"/>
+    </extension>
+
+    <extension
+          point="org.eclipse.ui.bindings">
+        <key
+              commandId="com.holgersiegel.favorites.commands.addCurrentEditor"
+              contextId="org.eclipse.ui.contexts.window"
+              schemeId="org.eclipse.ui.defaultAcceleratorConfiguration"
+              sequence="M1+M2+F"/>
+    </extension>
+
+    <extension
+          point="org.eclipse.ui.menus">
+        <menuContribution
+              locationURI="toolbar:com.holgersiegel.favorites.views.FavoritesView">
+            <command
+                  commandId="com.holgersiegel.favorites.commands.addCurrentEditor"
+                  label="Add Current Editor"
+                  style="push"/>
+            <command
+                  commandId="com.holgersiegel.favorites.commands.removeSelected"
+                  label="Remove"
+                  style="push">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </command>
+          </menuContribution>
+
+        <menuContribution
+              locationURI="popup:com.holgersiegel.favorites.views.FavoritesView">
+            <command
+                  commandId="com.holgersiegel.favorites.commands.open"
+                  label="Open"
+                  style="push">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </command>
+            <command
+                  commandId="com.holgersiegel.favorites.commands.revealInPackageExplorer"
+                  label="Reveal in Package Explorer"
+                  style="push">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </command>
+            <command
+                  commandId="com.holgersiegel.favorites.commands.copyPath"
+                  label="Copy Path"
+                  style="push">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </command>
+            <command
+                  commandId="com.holgersiegel.favorites.commands.removeSelected"
+                  label="Remove"
+                  style="push">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </command>
+          </menuContribution>
+    </extension>
+</plugin>
