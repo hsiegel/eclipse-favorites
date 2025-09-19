@@ -103,6 +103,17 @@
                 </with>
               </visibleWhen>
             </command>
+            <dynamic
+                  class="com.holgersiegel.favorites.menus.SuperTypeMenuContribution"
+                  id="com.holgersiegel.favorites.menus.superTypes">
+              <visibleWhen>
+                <with variable="selection">
+                  <iterate ifEmpty="false">
+                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
+                  </iterate>
+                </with>
+              </visibleWhen>
+            </dynamic>
             <command
                   commandId="com.holgersiegel.favorites.commands.revealInPackageExplorer"
                   label="Reveal in Package Explorer"
@@ -142,3 +153,4 @@
           </menuContribution>
     </extension>
 </plugin>
+

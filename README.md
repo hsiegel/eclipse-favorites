@@ -2,7 +2,7 @@
 
 ## HOWTO
 - **Build**: `mvn -V -U -B clean verify`
-- **Install**: In Eclipse `Help ▸ Install New Software…` and point to `com.holgersiegel.favorites.updatesite/target/repository`. *Fallback*: `File ▸ Export ▸ Deployable plug-ins and fragments` on the `com.holgersiegel.favorites` project into your dropins folder.
+- **Install**: In Eclipse `Help -> Install New Software...` use the published update site `https://holgersiegel.github.io/eclipsefav/` or the local build at `com.holgersiegel.favorites.updatesite/target/repository`. *Fallback*: `File -> Export -> Deployable plug-ins and fragments` on the `com.holgersiegel.favorites` project into your dropins folder.
 - **Use**: `Window ▸ Show View ▸ Other… ▸ General ▸ Favorites`, then drag resources or files into the view.
 
 ## Overview
@@ -38,6 +38,15 @@ The Favorites View plug-in provides a drag-and-drop enabled tree for quickly pin
 - Update site `com.holgersiegel.favorites.updatesite`
 
 ## License
-MIT License © 2025 Holger Siegel
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the conditions in the source headers.
+This project is licensed under the **Holger-NonCommercial-Personal-Work-License 1.0**.
+
+- Public use: free of charge, non-commercial only.  
+- Author’s exception: only Holger Siegel himself may use it in the course of his
+  employment at his current employer.  
+- No rights for colleagues, other employees, or the employer as a whole.  
+
+See [LICENSE](./LICENSE.md) for the full text
+
+
+
