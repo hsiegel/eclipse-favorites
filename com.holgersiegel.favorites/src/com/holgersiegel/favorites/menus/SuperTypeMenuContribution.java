@@ -66,6 +66,12 @@ public class SuperTypeMenuContribution extends CompoundContributionItem implemen
             for (IType type : superTypes) {
                 manager.add(createOpenTypeItem(type));
             }
+        } else {
+            manager.add(new Action("Keine Superklassen oder Interfaces verfügbar") {
+                {
+                    setEnabled(false);
+                }
+            });
         }
         return new IContributionItem[] { manager };
     }
