@@ -13,4 +13,19 @@
     <artifactId>com.holgersiegel.favorites</artifactId>
     <packaging>eclipse-plugin</packaging>
     <name>Favorites View Plug-in</name>
+    <build>
+        <resources>
+            <resource>
+                <directory>${project.basedir}</directory>
+                <includes>
+                    <include>plugin.xml</include>
+                    <include>plugin.properties</include>
+                    <include>OSGI-INF/**</include>
+                    <include>icons/**</include>
+                    <include>css/**</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
 </project>
+
