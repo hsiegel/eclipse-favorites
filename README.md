@@ -18,7 +18,7 @@ The Favorites View plug-in provides a drag-and-drop enabled tree for quickly pin
 ## Commands & Shortcuts
 - `Add Current Editor to Favorites` (`M1+M2+F`) – toolbar and command palette.
 - `Remove from Favorites` – toolbar, context menu, multi-selection aware.
-- Context menu additions: `Open`, `Reveal in Package Explorer`, `Copy Path`, `Remove`.
+- Context menu additions: `Open`, `Reveal in Package Explorer`, `Copy Path`, `Remove`, plus a submenu that lists superclasses and inherited interfaces for Java favorites.
 
 ## Mini Smoke Test
 1. Drag a workspace file from the Package Explorer into Favorites – entry appears.
