@@ -2,7 +2,7 @@
 
 ## HOWTO
 - **Build**: `mvn -V -U -B clean verify`
-- **Install**: In Eclipse `Help -> Install New Software...` use the published update site `https://hsiegel.github.io/eclipse-favorites/` or the local build at `com.holgersiegel.favorites.updatesite/target/repository`. *Fallback*: `File -> Export -> Deployable plug-ins and fragments` on the `com.holgersiegel.favorites` project into your dropins folder.
+- **Install**: In Eclipse `Help -> Install New Software...` use the published update site `https://github.com/hsiegel/eclipse-favorites` or the local build at `com.holgersiegel.favorites.updatesite/target/repository`. *Fallback*: `File -> Export -> Deployable plug-ins and fragments` on the `com.holgersiegel.favorites` project into your dropins folder.
 - **Use**: `Window ▸ Show View ▸ Other… ▸ General ▸ Favorites`, then drag resources or files into the view.
 
 ## Overview
@@ -47,6 +47,7 @@ This project is licensed under the **Holger-NonCommercial-Personal-Work-License 
 - No rights for colleagues, other employees, or the employer as a whole.  
 
 See [LICENSE](./LICENSE.md) for the full text
+
 
 
 

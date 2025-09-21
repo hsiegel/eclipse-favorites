@@ -70,26 +70,6 @@
     <extension
           point="org.eclipse.ui.menus">
         <menuContribution
-              locationURI="toolbar:com.holgersiegel.favorites.views.FavoritesView">
-            <command
-                  commandId="com.holgersiegel.favorites.commands.addCurrentEditor"
-                  label="Add Current Editor"
-                  style="push"/>
-            <command
-                  commandId="com.holgersiegel.favorites.commands.removeSelected"
-                  label="Remove"
-                  style="push">
-              <visibleWhen>
-                <with variable="selection">
-                  <iterate ifEmpty="false">
-                    <instanceof value="com.holgersiegel.favorites.model.FavoriteEntry"/>
-                  </iterate>
-                </with>
-              </visibleWhen>
-            </command>
-          </menuContribution>
-
-        <menuContribution
               locationURI="popup:com.holgersiegel.favorites.views.FavoritesView">
             <command
                   commandId="com.holgersiegel.favorites.commands.open"

@@ -32,12 +32,36 @@ import org.eclipse.core.commands.ExecutionException;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.ui.handlers.HandlerUtil;
+import org.eclipse.ui.ISources;
 
 import com.holgersiegel.favorites.model.FavoriteEntry;
 import com.holgersiegel.favorites.model.FavoritesStore;
 import com.holgersiegel.favorites.util.FavoritesPlugin;
 
 public class RemoveHandler extends AbstractHandler {
+
+    @Override
+    public void setEnabled(Object evaluationContext) {
+        ISelection selection = null;
+        Object variable = HandlerUtil.getVariable(evaluationContext, ISources.ACTIVE_CURRENT_SELECTION_NAME);
+        if (variable instanceof ISelection) {
+            selection = (ISelection) variable;
+        }
+        boolean enabled = false;
+        if (selection instanceof IStructuredSelection) {
+            IStructuredSelection structured = (IStructuredSelection) selection;
+            if (!structured.isEmpty()) {
+                enabled = true;
+                for (Object element : structured.toArray()) {
+                    if (!(element instanceof FavoriteEntry)) {
+                        enabled = false;
+                        break;
+                    }
+                }
+            }
+        }
+        setBaseEnabled(enabled);
+    }
 
     @Override
     public Object execute(ExecutionEvent event) throws ExecutionException {

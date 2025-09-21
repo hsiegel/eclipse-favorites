@@ -30,6 +30,7 @@ import java.util.Map;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.viewers.DecorationOverlayIcon;
 import org.eclipse.jface.viewers.IDecoration;
@@ -38,6 +39,7 @@ import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
+import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
@@ -54,10 +56,15 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.ui.handlers.IHandlerService;
+import org.eclipse.ui.menus.CommandContributionItem;
+import org.eclipse.ui.menus.CommandContributionItemParameter;
 import org.eclipse.ui.ISharedImages;
+import org.eclipse.ui.ISources;
+import org.eclipse.ui.IViewSite;
 import org.eclipse.ui.IWorkbenchPartSite;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.part.ViewPart;
+import org.eclipse.ui.services.IEvaluationService;
 
 import com.holgersiegel.favorites.dnd.FavoritesDragSource;
 import com.holgersiegel.favorites.dnd.FavoritesDropAdapter;
@@ -71,10 +78,16 @@ public class FavoritesView extends ViewPart {
 
     public static final String ID = "com.holgersiegel.favorites.views.FavoritesView";
     private static final String OPEN_COMMAND_ID = "com.holgersiegel.favorites.commands.open";
+    private static final String ADD_COMMAND_ID = "com.holgersiegel.favorites.commands.addCurrentEditor";
+    private static final String REMOVE_COMMAND_ID = "com.holgersiegel.favorites.commands.removeSelected";
 
     private TreeViewer viewer;
     private FavoritesStore store;
     private FavoritesStoreListener storeListener;
+    private ISelectionChangedListener handlerUpdateListener;
+    private CommandContributionItem addToolbarItem;
+    private CommandContributionItem removeToolbarItem;
+    private IEvaluationService evaluationService;
 
     @Override
     public void createPartControl(Composite parent) {
@@ -89,9 +102,11 @@ public class FavoritesView extends ViewPart {
         ColumnViewerToolTipSupport.enableFor(viewer);
 
         getSite().setSelectionProvider(viewer);
+        configureToolbar();
         registerContextMenu();
         hookDoubleClick();
         hookDragAndDrop();
+        hookHandlerUpdates();
 
         storeListener = entries -> asyncRefresh();
         if (store != null) {
@@ -115,12 +130,94 @@ public class FavoritesView extends ViewPart {
             store.removeListener(storeListener);
         }
         if (viewer != null) {
+            if (handlerUpdateListener != null) {
+                viewer.removeSelectionChangedListener(handlerUpdateListener);
+                handlerUpdateListener = null;
+            }
             ColumnLabelProvider labelProvider = (ColumnLabelProvider) viewer.getLabelProvider();
             if (labelProvider instanceof FavoritesLabelProvider) {
                 ((FavoritesLabelProvider) labelProvider).disposeResources();
             }
         }
+        addToolbarItem = null;
+        removeToolbarItem = null;
+        evaluationService = null;
         super.dispose();
+    }
+
+    private void configureToolbar() {
+        IViewSite viewSite = getViewSite();
+        if (viewSite == null) {
+            return;
+        }
+        var actionBars = viewSite.getActionBars();
+        if (actionBars == null) {
+            return;
+        }
+        IToolBarManager toolBarManager = actionBars.getToolBarManager();
+        if (toolBarManager == null) {
+            return;
+        }
+        var sharedImages = PlatformUI.getWorkbench().getSharedImages();
+        ImageDescriptor addIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_OBJ_ADD);
+        ImageDescriptor removeIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_DELETE);
+        String addItemId = toolbarItemId(ADD_COMMAND_ID);
+        toolBarManager.remove(addItemId);
+        addToolbarItem = createCommandContribution(viewSite, addItemId, ADD_COMMAND_ID, "Add Current Editor",
+                addIcon, null);
+        toolBarManager.add(addToolbarItem);
+        String removeItemId = toolbarItemId(REMOVE_COMMAND_ID);
+        toolBarManager.remove(removeItemId);
+        removeToolbarItem = createCommandContribution(viewSite, removeItemId, REMOVE_COMMAND_ID, "Remove",
+                removeIcon, null);
+        toolBarManager.add(removeToolbarItem);
+        toolBarManager.update(true);
+        actionBars.updateActionBars();
+        updateRemoveEnablement();
+    }
+
+    private CommandContributionItem createCommandContribution(IWorkbenchPartSite site, String itemId, String commandId,
+            String label, ImageDescriptor icon, ImageDescriptor disabledIcon) {
+        if (icon != null && disabledIcon == null) {
+            disabledIcon = ImageDescriptor.createWithFlags(icon, SWT.IMAGE_DISABLE);
+        }
+        CommandContributionItemParameter params = new CommandContributionItemParameter(site, itemId, commandId,
+                CommandContributionItem.STYLE_PUSH);
+        params.label = label;
+        params.tooltip = label;
+        params.icon = icon;
+        params.disabledIcon = disabledIcon;
+        params.mode = CommandContributionItem.MODE_FORCE_TEXT;
+        return new CommandContributionItem(params);
+    }
+
+    private static String toolbarItemId(String commandId) {
+        return commandId + ".toolbar";
+    }
+
+    private void hookHandlerUpdates() {
+        evaluationService = getSite().getService(IEvaluationService.class);
+        if (viewer == null) {
+            return;
+        }
+        if (handlerUpdateListener != null) {
+            viewer.removeSelectionChangedListener(handlerUpdateListener);
+        }
+        handlerUpdateListener = event -> updateRemoveEnablement();
+        viewer.addSelectionChangedListener(handlerUpdateListener);
+        updateRemoveEnablement();
+    }
+
+    private void updateRemoveEnablement() {
+        if (evaluationService != null) {
+            evaluationService.requestEvaluation(ISources.ACTIVE_CURRENT_SELECTION_NAME);
+        }
+        if (removeToolbarItem != null) {
+            removeToolbarItem.update(null);
+        }
+        if (addToolbarItem != null) {
+            addToolbarItem.update(null);
+        }
     }
 
     private void registerContextMenu() {
