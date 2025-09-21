@@ -30,6 +30,7 @@ import java.util.Map;
 
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
 import org.eclipse.jface.viewers.DecorationOverlayIcon;
@@ -40,6 +41,7 @@ import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DoubleClickEvent;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
+import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
@@ -56,8 +58,6 @@ import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.ui.handlers.IHandlerService;
-import org.eclipse.ui.menus.CommandContributionItem;
-import org.eclipse.ui.menus.CommandContributionItemParameter;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.ISources;
 import org.eclipse.ui.IViewSite;
@@ -85,8 +85,8 @@ public class FavoritesView extends ViewPart {
     private FavoritesStore store;
     private FavoritesStoreListener storeListener;
     private ISelectionChangedListener handlerUpdateListener;
-    private CommandContributionItem addToolbarItem;
-    private CommandContributionItem removeToolbarItem;
+    private Action addToolbarAction;
+    private Action removeToolbarAction;
     private IEvaluationService evaluationService;
 
     @Override
@@ -139,8 +139,8 @@ public class FavoritesView extends ViewPart {
                 ((FavoritesLabelProvider) labelProvider).disposeResources();
             }
         }
-        addToolbarItem = null;
-        removeToolbarItem = null;
+        addToolbarAction = null;
+        removeToolbarAction = null;
         evaluationService = null;
         super.dispose();
     }
@@ -161,38 +161,53 @@ public class FavoritesView extends ViewPart {
         var sharedImages = PlatformUI.getWorkbench().getSharedImages();
         ImageDescriptor addIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_OBJ_ADD);
         ImageDescriptor removeIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_DELETE);
-        String addItemId = toolbarItemId(ADD_COMMAND_ID);
-        toolBarManager.remove(addItemId);
-        addToolbarItem = createCommandContribution(viewSite, addItemId, ADD_COMMAND_ID, "Add Current Editor",
-                addIcon, null);
-        toolBarManager.add(addToolbarItem);
-        String removeItemId = toolbarItemId(REMOVE_COMMAND_ID);
-        toolBarManager.remove(removeItemId);
-        removeToolbarItem = createCommandContribution(viewSite, removeItemId, REMOVE_COMMAND_ID, "Remove",
-                removeIcon, null);
-        toolBarManager.add(removeToolbarItem);
+        String addActionId = toolbarItemId(ADD_COMMAND_ID);
+        toolBarManager.remove(addActionId);
+        addToolbarAction = createCommandAction(addActionId, ADD_COMMAND_ID, "Add Current Editor", addIcon);
+        toolBarManager.add(addToolbarAction);
+        String removeActionId = toolbarItemId(REMOVE_COMMAND_ID);
+        toolBarManager.remove(removeActionId);
+        removeToolbarAction = createCommandAction(removeActionId, REMOVE_COMMAND_ID, "Remove", removeIcon);
+        toolBarManager.add(removeToolbarAction);
         toolBarManager.update(true);
         actionBars.updateActionBars();
         updateRemoveEnablement();
     }
 
-    private CommandContributionItem createCommandContribution(IWorkbenchPartSite site, String itemId, String commandId,
-            String label, ImageDescriptor icon, ImageDescriptor disabledIcon) {
-        if (icon != null && disabledIcon == null) {
-            disabledIcon = ImageDescriptor.createWithFlags(icon, SWT.IMAGE_DISABLE);
+    private Action createCommandAction(String itemId, String commandId, String label, ImageDescriptor icon) {
+        Action action = new Action(label) {
+            @Override
+            public void run() {
+                executeCommand(commandId);
+            }
+        };
+        action.setId(itemId);
+        action.setToolTipText(label);
+        if (icon != null) {
+            action.setImageDescriptor(icon);
+            action.setDisabledImageDescriptor(ImageDescriptor.createWithFlags(icon, SWT.IMAGE_DISABLE));
         }
-        CommandContributionItemParameter params = new CommandContributionItemParameter(site, itemId, commandId,
-                CommandContributionItem.STYLE_PUSH);
-        params.label = label;
-        params.tooltip = label;
-        params.icon = icon;
-        params.disabledIcon = disabledIcon;
-        params.mode = CommandContributionItem.MODE_FORCE_TEXT;
-        return new CommandContributionItem(params);
+        return action;
     }
 
     private static String toolbarItemId(String commandId) {
         return commandId + ".toolbar";
+    }
+
+    private void executeCommand(String commandId) {
+        IHandlerService handlerService = getSite().getService(IHandlerService.class);
+        if (handlerService == null) {
+            return;
+        }
+        try {
+            handlerService.executeCommand(commandId, null);
+        } catch (Exception ex) {
+            FavoritesPlugin plugin = FavoritesPlugin.getDefault();
+            if (plugin != null) {
+                plugin.getLog().log(new Status(IStatus.ERROR, FavoritesPlugin.PLUGIN_ID,
+                        "Command execution failed: " + commandId, ex));
+            }
+        }
     }
 
     private void hookHandlerUpdates() {
@@ -209,15 +224,29 @@ public class FavoritesView extends ViewPart {
     }
 
     private void updateRemoveEnablement() {
+        boolean hasSelection = hasFavoriteSelection();
+        if (removeToolbarAction != null) {
+            removeToolbarAction.setEnabled(hasSelection);
+        }
         if (evaluationService != null) {
             evaluationService.requestEvaluation(ISources.ACTIVE_CURRENT_SELECTION_NAME);
         }
-        if (removeToolbarItem != null) {
-            removeToolbarItem.update(null);
+    }
+
+    private boolean hasFavoriteSelection() {
+        if (viewer == null) {
+            return false;
         }
-        if (addToolbarItem != null) {
-            addToolbarItem.update(null);
+        IStructuredSelection selection = viewer.getStructuredSelection();
+        if (selection == null || selection.isEmpty()) {
+            return false;
         }
+        for (Object element : selection.toArray()) {
+            if (!(element instanceof FavoriteEntry)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void registerContextMenu() {
@@ -259,24 +288,9 @@ public class FavoritesView extends ViewPart {
                 return;
             }
             viewer.refresh();
+            updateRemoveEnablement();
         });
     }
-
-    private void executeCommand(String commandId) {
-        IHandlerService handlerService = getSite().getService(IHandlerService.class);
-        if (handlerService == null) {
-            return;
-        }
-        try {
-            handlerService.executeCommand(commandId, null);
-        } catch (Exception ex) {
-            FavoritesPlugin plugin = FavoritesPlugin.getDefault();
-            if (plugin != null) {
-                plugin.getLog().log(new Status(IStatus.ERROR, FavoritesPlugin.PLUGIN_ID, "Command execution failed", ex));
-            }
-        }
-    }
-
     private static final class FavoritesContentProvider implements ITreeContentProvider {
         @Override
         public Object[] getElements(Object inputElement) {
