@@ -23,22 +23,30 @@
  */
 package com.holgersiegel.favorites.views;
 
+import java.net.URI;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
+import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
-import org.eclipse.jface.viewers.DecorationOverlayIcon;
-import org.eclipse.jface.viewers.IDecoration;
 import org.eclipse.jface.resource.ImageDescriptor;
+import org.eclipse.jface.resource.JFaceResources;
+import org.eclipse.jface.util.LocalSelectionTransfer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
+import org.eclipse.jface.viewers.DecorationOverlayIcon;
 import org.eclipse.jface.viewers.DoubleClickEvent;
+import org.eclipse.jface.viewers.IDecoration;
 import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
@@ -49,23 +57,32 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.FileTransfer;
 import org.eclipse.swt.dnd.Transfer;
-import org.eclipse.jface.util.LocalSelectionTransfer;
-import org.eclipse.ui.part.ResourceTransfer;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
-import org.eclipse.ui.handlers.IHandlerService;
+import org.eclipse.ui.IEditorInput;
+import org.eclipse.ui.IEditorPart;
+import org.eclipse.ui.IFileEditorInput;
+import org.eclipse.ui.IPathEditorInput;
+import org.eclipse.ui.IPartListener2;
 import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.ISources;
+import org.eclipse.ui.IURIEditorInput;
 import org.eclipse.ui.IViewSite;
+import org.eclipse.ui.IWorkbenchPage;
+import org.eclipse.ui.IWorkbenchPart;
+import org.eclipse.ui.IWorkbenchPartReference;
 import org.eclipse.ui.IWorkbenchPartSite;
+import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.PlatformUI;
+import org.eclipse.ui.handlers.IHandlerService;
+import org.eclipse.ui.part.ResourceTransfer;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.ui.services.IEvaluationService;
-
 import com.holgersiegel.favorites.dnd.FavoritesDragSource;
 import com.holgersiegel.favorites.dnd.FavoritesDropAdapter;
 import com.holgersiegel.favorites.model.FavoriteEntry;
@@ -82,6 +99,9 @@ public class FavoritesView extends ViewPart {
     private static final String REMOVE_COMMAND_ID = "com.holgersiegel.favorites.commands.removeSelected";
 
     private TreeViewer viewer;
+    private FavoritesLabelProvider labelProvider;
+    private IPartListener2 partListener;
+    private String currentEditorKey;
     private FavoritesStore store;
     private FavoritesStoreListener storeListener;
     private ISelectionChangedListener handlerUpdateListener;
@@ -95,7 +115,7 @@ public class FavoritesView extends ViewPart {
 
         viewer = new TreeViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL);
         viewer.setContentProvider(new FavoritesContentProvider());
-        FavoritesLabelProvider labelProvider = new FavoritesLabelProvider();
+        labelProvider = new FavoritesLabelProvider();
         viewer.setLabelProvider(labelProvider);
         viewer.setUseHashlookup(true);
         viewer.setInput(store);
@@ -107,6 +127,7 @@ public class FavoritesView extends ViewPart {
         hookDoubleClick();
         hookDragAndDrop();
         hookHandlerUpdates();
+        hookEditorTracking();
 
         storeListener = entries -> asyncRefresh();
         if (store != null) {
@@ -129,19 +150,28 @@ public class FavoritesView extends ViewPart {
         if (store != null && storeListener != null) {
             store.removeListener(storeListener);
         }
-        if (viewer != null) {
-            if (handlerUpdateListener != null) {
-                viewer.removeSelectionChangedListener(handlerUpdateListener);
-                handlerUpdateListener = null;
+        if (partListener != null) {
+            IWorkbenchPartSite site = getSite();
+            if (site != null) {
+                IWorkbenchWindow window = site.getWorkbenchWindow();
+                if (window != null) {
+                    window.getPartService().removePartListener(partListener);
+                }
             }
-            ColumnLabelProvider labelProvider = (ColumnLabelProvider) viewer.getLabelProvider();
-            if (labelProvider instanceof FavoritesLabelProvider) {
-                ((FavoritesLabelProvider) labelProvider).disposeResources();
-            }
+            partListener = null;
+        }
+        if (viewer != null && handlerUpdateListener != null) {
+            viewer.removeSelectionChangedListener(handlerUpdateListener);
+            handlerUpdateListener = null;
+        }
+        if (labelProvider != null) {
+            labelProvider.disposeResources();
+            labelProvider = null;
         }
         addToolbarAction = null;
         removeToolbarAction = null;
         evaluationService = null;
+        currentEditorKey = null;
         super.dispose();
     }
 
@@ -221,6 +251,169 @@ public class FavoritesView extends ViewPart {
         handlerUpdateListener = event -> updateRemoveEnablement();
         viewer.addSelectionChangedListener(handlerUpdateListener);
         updateRemoveEnablement();
+    }
+
+    private void hookEditorTracking() {
+        IWorkbenchPartSite site = getSite();
+        if (site == null) {
+            return;
+        }
+        IWorkbenchWindow window = site.getWorkbenchWindow();
+        if (window == null) {
+            return;
+        }
+        if (partListener != null) {
+            window.getPartService().removePartListener(partListener);
+        }
+        final IWorkbenchWindow workbenchWindow = window;
+        partListener = new IPartListener2() {
+            @Override
+            public void partActivated(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(partRef);
+            }
+
+            @Override
+            public void partBroughtToTop(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(partRef);
+            }
+
+            @Override
+            public void partClosed(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(workbenchWindow.getActivePage());
+            }
+
+            @Override
+            public void partDeactivated(IWorkbenchPartReference partRef) {
+                // no-op
+            }
+
+            @Override
+            public void partHidden(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(workbenchWindow.getActivePage());
+            }
+
+            @Override
+            public void partInputChanged(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(partRef);
+            }
+
+            @Override
+            public void partOpened(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(partRef);
+            }
+
+            @Override
+            public void partVisible(IWorkbenchPartReference partRef) {
+                updateCurrentEditor(partRef);
+            }
+        };
+        window.getPartService().addPartListener(partListener);
+        updateCurrentEditor(window.getActivePage());
+    }
+
+    private void updateCurrentEditor(IWorkbenchPartReference partRef) {
+        if (partRef == null) {
+            return;
+        }
+        IWorkbenchPart part = partRef.getPart(false);
+        if (part instanceof IEditorPart) {
+            applyCurrentEditorKey(extractEditorKey((IEditorPart) part));
+        }
+    }
+
+    private void updateCurrentEditor(IWorkbenchPage page) {
+        if (page == null) {
+            applyCurrentEditorKey(null);
+            return;
+        }
+        applyCurrentEditorKey(extractEditorKey(page.getActiveEditor()));
+    }
+
+    private void applyCurrentEditorKey(String newKey) {
+        if (newKey != null && newKey.isBlank()) {
+            newKey = null;
+        }
+        if (Objects.equals(currentEditorKey, newKey)) {
+            return;
+        }
+        currentEditorKey = newKey;
+        refreshHighlight();
+    }
+
+    private String extractEditorKey(IEditorPart editor) {
+        if (editor == null) {
+            return null;
+        }
+        IEditorInput input = editor.getEditorInput();
+        if (input == null) {
+            return null;
+        }
+        String absolutePath = resolveAbsolutePath(input);
+        if (absolutePath == null || absolutePath.isBlank()) {
+            return null;
+        }
+        return Resources.keyFor(absolutePath);
+    }
+
+    private String resolveAbsolutePath(IEditorInput input) {
+        if (input instanceof IFileEditorInput) {
+            IFile file = ((IFileEditorInput) input).getFile();
+            return Resources.toAbsolutePath(file);
+        }
+        IResource resource = (IResource) input.getAdapter(IResource.class);
+        if (resource != null) {
+            return Resources.toAbsolutePath(resource);
+        }
+        if (input instanceof IPathEditorInput) {
+            IPath pathValue = ((IPathEditorInput) input).getPath();
+            if (pathValue != null) {
+                String osString = pathValue.toOSString();
+                if (osString != null && !osString.isBlank()) {
+                    return osString;
+                }
+            }
+        }
+        if (input instanceof IURIEditorInput) {
+            URI uri = ((IURIEditorInput) input).getURI();
+            if (uri != null) {
+                try {
+                    if ("file".equalsIgnoreCase(uri.getScheme())) {
+                        return Paths.get(uri).toString();
+                    }
+                    return uri.getPath();
+                } catch (Exception ex) {
+                    return uri.getPath();
+                }
+            }
+        }
+        return null;
+    }
+
+    private void refreshHighlight() {
+        if (viewer == null) {
+            return;
+        }
+        Control control = viewer.getControl();
+        if (control == null || control.isDisposed()) {
+            return;
+        }
+        Display display = control.getDisplay();
+        display.asyncExec(() -> {
+            if (!control.isDisposed()) {
+                viewer.refresh();
+            }
+        });
+    }
+
+    private boolean isFavoriteOfCurrentEditor(FavoriteEntry entry) {
+        if (entry == null) {
+            return false;
+        }
+        if (currentEditorKey == null || currentEditorKey.isEmpty()) {
+            return false;
+        }
+        String entryKey = entry.getKey();
+        return entryKey != null && entryKey.equals(currentEditorKey);
     }
 
     private void updateRemoveEnablement() {
@@ -332,7 +525,7 @@ public class FavoritesView extends ViewPart {
         }
     }
 
-    private static final class FavoritesLabelProvider extends ColumnLabelProvider {
+    private final class FavoritesLabelProvider extends ColumnLabelProvider {
 
         private final Image fileImage;
         private final Image folderImage;
@@ -405,6 +598,14 @@ public class FavoritesView extends ViewPart {
                 }
             }
             return super.getForeground(element);
+        }
+
+        @Override
+        public Font getFont(Object element) {
+            if (element instanceof FavoriteEntry && isFavoriteOfCurrentEditor((FavoriteEntry) element)) {
+                return JFaceResources.getFontRegistry().getBold(JFaceResources.DEFAULT_FONT);
+            }
+            return super.getFont(element);
         }
 
         private Image chooseBaseImage(FavoriteEntry entry) {
