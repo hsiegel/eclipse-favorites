@@ -29,8 +29,11 @@ import java.util.List;
 import org.eclipse.core.commands.AbstractHandler;
 import org.eclipse.core.commands.ExecutionEvent;
 import org.eclipse.core.commands.ExecutionException;
+import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.handlers.HandlerUtil;
 import org.eclipse.ui.ISources;
 
@@ -39,6 +42,8 @@ import com.holgersiegel.favorites.model.FavoritesStore;
 import com.holgersiegel.favorites.util.FavoritesPlugin;
 
 public class RemoveHandler extends AbstractHandler {
+
+    private static final String TITLE = "Favorites";
 
     @Override
     public void setEnabled(Object evaluationContext) {
@@ -84,8 +89,39 @@ public class RemoveHandler extends AbstractHandler {
             }
         }
         if (!toRemove.isEmpty()) {
+            if (containsComment(toRemove) && !confirmDeletion(event, toRemove)) {
+                return null;
+            }
             store.remove(toRemove);
         }
         return null;
     }
+
+    private boolean confirmDeletion(ExecutionEvent event, List<FavoriteEntry> toRemove) {
+        Shell shell = HandlerUtil.getActiveShell(event);
+        if (shell == null) {
+            shell = Display.getDefault().getActiveShell();
+        }
+        if (shell == null) {
+            return true;
+        }
+        int count = toRemove.size();
+        String message;
+        if (count == 1) {
+            message = "Der ausgewaehlte Favorit enthaelt einen Kommentar.\nSoll der Eintrag inklusive Kommentar wirklich geloescht werden?";
+        } else {
+            message = "Mindestens einer der ausgewaehlten Favoriten enthaelt einen Kommentar.\nSollen die Eintraege inklusive Kommentare wirklich geloescht werden?";
+        }
+        return MessageDialog.openQuestion(shell, TITLE, message);
+    }
+
+    private boolean containsComment(List<FavoriteEntry> entries) {
+        for (FavoriteEntry entry : entries) {
+            if (entry != null && entry.hasComment()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

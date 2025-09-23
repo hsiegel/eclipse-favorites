@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -151,6 +152,24 @@ public class FavoritesStore {
         return changed;
     }
 
+    public synchronized void updateComment(FavoriteEntry entry, String comment) {
+        if (entry == null) {
+            return;
+        }
+        FavoriteEntry stored = entriesByKey.get(entry.getKey());
+        if (stored == null) {
+            return;
+        }
+        String normalized = comment == null || comment.isBlank() ? null : comment;
+        String current = stored.getComment();
+        if (Objects.equals(current, normalized)) {
+            return;
+        }
+        stored.setComment(comment);
+        saveNow();
+        notifyListeners();
+    }
+
     public synchronized void remove(Collection<FavoriteEntry> toRemove) {
         if (toRemove == null || toRemove.isEmpty()) {
             return;
@@ -236,6 +255,9 @@ public class FavoritesStore {
             existing.setWorkspacePath(entry.getWorkspacePath());
             existing.setAbsolutePath(entry.getAbsolutePath());
             existing.setStatus(entry.getStatus());
+            if (entry.hasComment()) {
+                existing.setComment(entry.getComment());
+            }
             if (persist) {
                 saveNow();
             }
@@ -385,6 +407,8 @@ public class FavoritesStore {
                 sb.append(',');
                 append(sb, "label", entry.getLabel());
                 sb.append(',');
+                append(sb, "comment", entry.getComment());
+                sb.append(',');
                 append(sb, "status", entry.getStatus().name());
                 sb.append('}');
             }
@@ -515,7 +539,8 @@ public class FavoritesStore {
                 String label = values.get("label");
                 String statusValue = values.get("status");
                 FavoriteEntry.Status status = statusValue == null ? FavoriteEntry.Status.OK : FavoriteEntry.Status.valueOf(statusValue.toUpperCase(Locale.ENGLISH));
-                return new FavoriteEntry(path, workspace, workspacePath, label, status);
+                String comment = values.get("comment");
+                return new FavoriteEntry(path, workspace, workspacePath, label, status, comment);
             }
 
             private String parseLiteral() {

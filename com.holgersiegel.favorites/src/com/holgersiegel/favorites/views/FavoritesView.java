@@ -43,6 +43,14 @@ import org.eclipse.jface.resource.ImageDescriptor;
 import org.eclipse.jface.resource.JFaceResources;
 import org.eclipse.jface.util.LocalSelectionTransfer;
 import org.eclipse.jface.viewers.ColumnLabelProvider;
+import org.eclipse.jface.viewers.CellEditor;
+import org.eclipse.jface.viewers.ColumnViewerEditor;
+import org.eclipse.jface.viewers.ColumnViewerEditorActivationEvent;
+import org.eclipse.jface.viewers.ColumnViewerEditorActivationStrategy;
+import org.eclipse.jface.viewers.EditingSupport;
+import org.eclipse.jface.viewers.TextCellEditor;
+import org.eclipse.jface.viewers.TreeViewerColumn;
+import org.eclipse.jface.viewers.TreeViewerEditor;
 import org.eclipse.jface.viewers.ColumnViewerToolTipSupport;
 import org.eclipse.jface.viewers.DecorationOverlayIcon;
 import org.eclipse.jface.viewers.DoubleClickEvent;
@@ -54,14 +62,23 @@ import org.eclipse.jface.viewers.ITreeContentProvider;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ControlAdapter;
+import org.eclipse.swt.events.ControlEvent;
+import org.eclipse.swt.events.KeyEvent;
+import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.FileTransfer;
 import org.eclipse.swt.dnd.Transfer;
 import org.eclipse.swt.graphics.Color;
+import org.eclipse.swt.graphics.Rectangle;
+import org.eclipse.swt.layout.GridData;
+import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.Tree;
+import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
 import org.eclipse.ui.IEditorInput;
@@ -104,6 +121,8 @@ public class FavoritesView extends ViewPart {
     private String currentEditorKey;
     private FavoritesStore store;
     private FavoritesStoreListener storeListener;
+    private TreeColumn commentColumn;
+    private static final int MIN_COMMENT_WIDTH = 200;
     private ISelectionChangedListener handlerUpdateListener;
     private Action addToolbarAction;
     private Action removeToolbarAction;
@@ -113,10 +132,18 @@ public class FavoritesView extends ViewPart {
     public void createPartControl(Composite parent) {
         store = FavoritesPlugin.getDefault().getFavoritesStore();
 
-        viewer = new TreeViewer(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL);
+        Composite container = new Composite(parent, SWT.NONE);
+        container.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        container.setLayout(new GridLayout(1, false));
+
+        viewer = new TreeViewer(container, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION);
         viewer.setContentProvider(new FavoritesContentProvider());
         labelProvider = new FavoritesLabelProvider();
         viewer.setLabelProvider(labelProvider);
+        viewer.getTree().setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
+        createColumns();
+        viewer.setColumnProperties(new String[] { "name", "comment" });
+        configureEditing();
         viewer.setUseHashlookup(true);
         viewer.setInput(store);
         ColumnViewerToolTipSupport.enableFor(viewer);
@@ -135,6 +162,70 @@ public class FavoritesView extends ViewPart {
         }
     }
 
+    private void createColumns() {
+        Tree tree = viewer.getTree();
+        tree.setHeaderVisible(true);
+        tree.setLinesVisible(true);
+
+        TreeViewerColumn nameViewerColumn = new TreeViewerColumn(viewer, SWT.LEFT);
+        TreeColumn nameColumn = nameViewerColumn.getColumn();
+        nameColumn.setText("Name");
+        nameColumn.setResizable(true);
+        nameColumn.setMoveable(true);
+        nameColumn.setWidth(240);
+        nameViewerColumn.setLabelProvider(labelProvider);
+
+        TreeViewerColumn commentViewerColumn = new TreeViewerColumn(viewer, SWT.LEFT);
+        commentColumn = commentViewerColumn.getColumn();
+        commentColumn.setText("Kommentar");
+        commentColumn.setResizable(true);
+        commentColumn.setMoveable(true);
+        commentColumn.setWidth(320);
+        commentViewerColumn.setLabelProvider(new CommentLabelProvider());
+        commentViewerColumn.setEditingSupport(new CommentEditingSupport(viewer));
+
+        tree.addControlListener(new ControlAdapter() {
+            @Override
+            public void controlResized(ControlEvent e) {
+                adjustCommentColumnWidth();
+            }
+        });
+        adjustCommentColumnWidth();
+    }
+
+    private void configureEditing() {
+        ColumnViewerEditorActivationStrategy activationStrategy = new ColumnViewerEditorActivationStrategy(viewer) {
+            @Override
+            protected boolean isEditorActivationEvent(ColumnViewerEditorActivationEvent event) {
+                int type = event.eventType;
+                if (type == ColumnViewerEditorActivationEvent.MOUSE_DOUBLE_CLICK_SELECTION) {
+                    return false;
+                }
+                if (type == ColumnViewerEditorActivationEvent.MOUSE_CLICK_SELECTION) {
+                    if (event.sourceEvent instanceof MouseEvent) {
+                        MouseEvent mouseEvent = (MouseEvent) event.sourceEvent;
+                        return mouseEvent.button == 1 && mouseEvent.count == 1;
+                    }
+                    return true;
+                }
+                if (type == ColumnViewerEditorActivationEvent.KEY_PRESSED && event.sourceEvent instanceof KeyEvent) {
+                    KeyEvent keyEvent = (KeyEvent) event.sourceEvent;
+                    if (keyEvent.keyCode == SWT.F2 || keyEvent.keyCode == SWT.CR) {
+                        return true;
+                    }
+                    return !Character.isISOControl(keyEvent.character);
+                }
+                if (type == ColumnViewerEditorActivationEvent.PROGRAMMATIC) {
+                    return true;
+                }
+                return super.isEditorActivationEvent(event);
+            }
+        };
+        TreeViewerEditor.create(viewer, activationStrategy,
+                ColumnViewerEditor.TABBING_HORIZONTAL | ColumnViewerEditor.TABBING_MOVE_TO_ROW_NEIGHBOR
+                        | ColumnViewerEditor.KEYBOARD_ACTIVATION);
+    }
+
     @Override
     public void setFocus() {
         if (viewer != null) {
@@ -142,6 +233,35 @@ public class FavoritesView extends ViewPart {
             if (control != null && !control.isDisposed()) {
                 control.setFocus();
             }
+        }
+    }
+
+    private void adjustCommentColumnWidth() {
+        if (commentColumn == null || commentColumn.isDisposed()) {
+            return;
+        }
+        Tree tree = commentColumn.getParent();
+        if (tree == null || tree.isDisposed()) {
+            return;
+        }
+        Rectangle area = tree.getClientArea();
+        if (area.width <= 0) {
+            return;
+        }
+        int otherWidth = 0;
+        for (TreeColumn column : tree.getColumns()) {
+            if (column == commentColumn) {
+                continue;
+            }
+            otherWidth += column.getWidth();
+        }
+        int available = area.width - otherWidth;
+        if (available < MIN_COMMENT_WIDTH) {
+            available = MIN_COMMENT_WIDTH;
+        }
+        int current = commentColumn.getWidth();
+        if (Math.abs(available - current) > 2) {
+            commentColumn.setWidth(available);
         }
     }
 
@@ -522,6 +642,66 @@ public class FavoritesView extends ViewPart {
         @Override
         public void dispose() {
             // no-op
+        }
+    }
+
+    private static final class CommentLabelProvider extends ColumnLabelProvider {
+
+        @Override
+        public String getText(Object element) {
+            if (element instanceof FavoriteEntry) {
+                String comment = ((FavoriteEntry) element).getComment();
+                return comment == null ? "" : comment;
+            }
+            return super.getText(element);
+        }
+    }
+
+    private final class CommentEditingSupport extends EditingSupport {
+
+        private final TextCellEditor editor;
+
+        CommentEditingSupport(TreeViewer viewer) {
+            super(viewer);
+            editor = new TextCellEditor(viewer.getTree());
+        }
+
+        @Override
+        protected CellEditor getCellEditor(Object element) {
+            return editor;
+        }
+
+        @Override
+        protected boolean canEdit(Object element) {
+            return element instanceof FavoriteEntry;
+        }
+
+        @Override
+        protected Object getValue(Object element) {
+            if (element instanceof FavoriteEntry) {
+                String comment = ((FavoriteEntry) element).getComment();
+                return comment == null ? "" : comment;
+            }
+            return "";
+        }
+
+        @Override
+        protected void setValue(Object element, Object value) {
+            if (!(element instanceof FavoriteEntry)) {
+                return;
+            }
+            FavoriteEntry entry = (FavoriteEntry) element;
+            String newComment = value == null ? null : value.toString();
+            String normalized = newComment == null || newComment.isBlank() ? null : newComment;
+            if (Objects.equals(entry.getComment(), normalized)) {
+                return;
+            }
+            if (store != null) {
+                store.updateComment(entry, newComment);
+            } else {
+                entry.setComment(newComment);
+            }
+            getViewer().update(entry, null);
         }
     }
 

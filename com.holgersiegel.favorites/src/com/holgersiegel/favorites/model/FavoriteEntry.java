@@ -39,13 +39,19 @@ public class FavoriteEntry {
     private String workspacePath;
     private String label;
     private Status status;
+    private String comment;
 
     public FavoriteEntry(String absolutePath, boolean workspaceResource, String workspacePath, String label, Status status) {
+        this(absolutePath, workspaceResource, workspacePath, label, status, null);
+    }
+
+    public FavoriteEntry(String absolutePath, boolean workspaceResource, String workspacePath, String label, Status status, String comment) {
         this.absolutePath = absolutePath;
         this.workspaceResource = workspaceResource;
         this.workspacePath = workspacePath;
         this.label = label;
         this.status = status == null ? Status.OK : status;
+        setComment(comment);
     }
 
     public String getAbsolutePath() {
@@ -74,6 +80,22 @@ public class FavoriteEntry {
 
     public void setLabel(String label) {
         this.label = label;
+    }
+
+    public String getComment() {
+        return comment;
+    }
+
+    public void setComment(String comment) {
+        if (comment == null || comment.isBlank()) {
+            this.comment = null;
+        } else {
+            this.comment = comment;
+        }
+    }
+
+    public boolean hasComment() {
+        return comment != null;
     }
 
     public Status getStatus() {
