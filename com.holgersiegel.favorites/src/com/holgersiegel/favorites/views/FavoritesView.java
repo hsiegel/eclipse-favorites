@@ -144,6 +144,7 @@ public class FavoritesView extends ViewPart {
         createColumns();
         viewer.setColumnProperties(new String[] { "name", "comment" });
         configureEditing();
+        hideTreeHeader();
         viewer.setUseHashlookup(true);
         viewer.setInput(store);
         ColumnViewerToolTipSupport.enableFor(viewer);
@@ -164,14 +165,13 @@ public class FavoritesView extends ViewPart {
 
     private void createColumns() {
         Tree tree = viewer.getTree();
-        tree.setHeaderVisible(true);
         tree.setLinesVisible(true);
 
         TreeViewerColumn nameViewerColumn = new TreeViewerColumn(viewer, SWT.LEFT);
         TreeColumn nameColumn = nameViewerColumn.getColumn();
         nameColumn.setText("Name");
         nameColumn.setResizable(true);
-        nameColumn.setMoveable(true);
+        nameColumn.setMoveable(false);
         nameColumn.setWidth(240);
         nameViewerColumn.setLabelProvider(labelProvider);
 
@@ -179,7 +179,7 @@ public class FavoritesView extends ViewPart {
         commentColumn = commentViewerColumn.getColumn();
         commentColumn.setText("Kommentar");
         commentColumn.setResizable(true);
-        commentColumn.setMoveable(true);
+        commentColumn.setMoveable(false);
         commentColumn.setWidth(320);
         commentViewerColumn.setLabelProvider(new CommentLabelProvider());
         commentViewerColumn.setEditingSupport(new CommentEditingSupport(viewer));
@@ -191,6 +191,14 @@ public class FavoritesView extends ViewPart {
             }
         });
         adjustCommentColumnWidth();
+        hideTreeHeader();
+    }
+
+    private void hideTreeHeader() {
+        Tree tree = viewer.getTree();
+        if (tree != null && !tree.isDisposed()) {
+            tree.setHeaderVisible(false);
+        }
     }
 
     private void configureEditing() {
@@ -819,9 +827,4 @@ public class FavoritesView extends ViewPart {
         }
     }
 }
-
-
-
-
-
 
