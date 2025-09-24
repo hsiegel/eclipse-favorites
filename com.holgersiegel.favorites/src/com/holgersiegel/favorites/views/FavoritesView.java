@@ -675,7 +675,7 @@ public class FavoritesView extends ViewPart {
         }
     }
 
-    private static final class CommentLabelProvider extends ColumnLabelProvider {
+    private final class CommentLabelProvider extends ColumnLabelProvider {
 
         @Override
         public String getText(Object element) {
@@ -684,6 +684,14 @@ public class FavoritesView extends ViewPart {
                 return comment == null ? "" : comment;
             }
             return super.getText(element);
+        }
+
+        @Override
+        public Font getFont(Object element) {
+            if (element instanceof FavoriteEntry && isFavoriteOfCurrentEditor((FavoriteEntry) element)) {
+                return JFaceResources.getFontRegistry().getBold(JFaceResources.DEFAULT_FONT);
+            }
+            return super.getFont(element);
         }
     }
 
@@ -849,4 +857,6 @@ public class FavoritesView extends ViewPart {
         }
     }
 }
+
+
 
