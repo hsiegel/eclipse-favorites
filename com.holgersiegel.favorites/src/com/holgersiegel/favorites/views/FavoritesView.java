@@ -122,6 +122,9 @@ public class FavoritesView extends ViewPart {
     private FavoritesStore store;
     private FavoritesStoreListener storeListener;
     private TreeColumn commentColumn;
+    private int lastTreeWidth = -1;
+    private boolean commentAutoWidth = true;
+    private boolean adjustingCommentWidth;
     private static final int MIN_COMMENT_WIDTH = 200;
     private ISelectionChangedListener handlerUpdateListener;
     private Action addToolbarAction;
@@ -144,7 +147,6 @@ public class FavoritesView extends ViewPart {
         createColumns();
         viewer.setColumnProperties(new String[] { "name", "comment" });
         configureEditing();
-        hideTreeHeader();
         viewer.setUseHashlookup(true);
         viewer.setInput(store);
         ColumnViewerToolTipSupport.enableFor(viewer);
@@ -165,7 +167,11 @@ public class FavoritesView extends ViewPart {
 
     private void createColumns() {
         Tree tree = viewer.getTree();
+        commentAutoWidth = true;
+        adjustingCommentWidth = false;
+        lastTreeWidth = -1;
         tree.setLinesVisible(true);
+        tree.setHeaderVisible(true);
 
         TreeViewerColumn nameViewerColumn = new TreeViewerColumn(viewer, SWT.LEFT);
         TreeColumn nameColumn = nameViewerColumn.getColumn();
@@ -180,25 +186,17 @@ public class FavoritesView extends ViewPart {
         commentColumn.setText("Kommentar");
         commentColumn.setResizable(true);
         commentColumn.setMoveable(false);
-        commentColumn.setWidth(320);
+        setCommentColumnWidth(320);
+        commentColumn.addListener(SWT.Resize, event -> {
+            if (!adjustingCommentWidth) {
+                commentAutoWidth = false;
+            }
+        });
         commentViewerColumn.setLabelProvider(new CommentLabelProvider());
         commentViewerColumn.setEditingSupport(new CommentEditingSupport(viewer));
 
-        tree.addControlListener(new ControlAdapter() {
-            @Override
-            public void controlResized(ControlEvent e) {
-                adjustCommentColumnWidth();
-            }
-        });
+        tree.addListener(SWT.Resize, event -> adjustCommentColumnWidth());
         adjustCommentColumnWidth();
-        hideTreeHeader();
-    }
-
-    private void hideTreeHeader() {
-        Tree tree = viewer.getTree();
-        if (tree != null && !tree.isDisposed()) {
-            tree.setHeaderVisible(false);
-        }
     }
 
     private void configureEditing() {
@@ -256,6 +254,10 @@ public class FavoritesView extends ViewPart {
         if (area.width <= 0) {
             return;
         }
+        if (area.width == lastTreeWidth) {
+            return;
+        }
+        lastTreeWidth = area.width;
         int otherWidth = 0;
         for (TreeColumn column : tree.getColumns()) {
             if (column == commentColumn) {
@@ -264,12 +266,32 @@ public class FavoritesView extends ViewPart {
             otherWidth += column.getWidth();
         }
         int available = area.width - otherWidth;
+        if (available < 0) {
+            available = 0;
+        }
+        if (!commentAutoWidth) {
+            if (available < commentColumn.getWidth()) {
+                setCommentColumnWidth(available);
+            }
+            return;
+        }
         if (available < MIN_COMMENT_WIDTH) {
             available = MIN_COMMENT_WIDTH;
         }
-        int current = commentColumn.getWidth();
-        if (Math.abs(available - current) > 2) {
-            commentColumn.setWidth(available);
+        if (Math.abs(available - commentColumn.getWidth()) > 2) {
+            setCommentColumnWidth(available);
+        }
+    }
+
+    private void setCommentColumnWidth(int width) {
+        if (commentColumn == null || commentColumn.isDisposed()) {
+            return;
+        }
+        adjustingCommentWidth = true;
+        try {
+            commentColumn.setWidth(width);
+        } finally {
+            adjustingCommentWidth = false;
         }
     }
 
