@@ -1,54 +1,42 @@
 # Favorites View
 
-## HOWTO
-- **Build**: `mvn -V -U -B clean verify`
-- **Install**: In Eclipse `Help -> Install New Software...` use the published update site `https://github.com/hsiegel/eclipse-favorites` or the local build at `com.holgersiegel.favorites.updatesite/target/repository`. *Fallback*: `File -> Export -> Deployable plug-ins and fragments` on the `com.holgersiegel.favorites` project into your dropins folder.
-- **Use**: `Window ▸ Show View ▸ Other… ▸ General ▸ Favorites`, then drag resources or files into the view.
+Eclipse plug-in for a drag-and-drop favorites tree (files/folders) in the workbench.
 
-## Overview
-The Favorites View plug-in provides a drag-and-drop enabled tree for quickly pinning frequently used files and folders. Entries persist across restarts, expose context menu commands (open, reveal, copy path, remove), support reordering, and integrate with the workbench via a toolbar and a key binding (`Ctrl+Alt+F` / `Cmd+Alt+F`) to add the active editor.
+## Local Build and Install
 
-## Key Features
-- Drag & drop from Package/Project Explorer, navigator views, and the OS (FileTransfer, ResourceTransfer, LocalSelectionTransfer).
-- Optional drag-out to the OS for existing filesystem entries.
-- Double-click to open files or reveal folders, plus explicit commands for reveal and copy path.
-- Favorites persist as JSON in the instance scope preferences; missing entries are highlighted and tooltipped.
-- Background listener keeps entries in sync with workspace move/rename/delete events.
+This repository intentionally contains no published update site.  
+Users build the plug-in themselves from readable source and install it locally.
 
-## Commands & Shortcuts
-- `Add Current Editor to Favorites` (`M1+M2+F`) – toolbar and command palette.
-- `Remove from Favorites` – toolbar, context menu, multi-selection aware.
-- Context menu additions: `Open`, `Reveal in Package Explorer`, `Copy Path`, `Remove`, plus a submenu that lists superclasses and inherited interfaces for Java favorites.
+### Requirements
+- Java 17 or newer
+- Maven 3.8.6 or newer
+- Eclipse IDE
 
-## Mini Smoke Test
-1. Drag a workspace file from the Package Explorer into Favorites – entry appears.
-2. Drag an external file from the OS into Favorites – entry appears.
-3. Double-click each entry – files open, folders reveal in Package Explorer.
-4. Restart Eclipse – Favorites View still shows the entries.
-5. Delete a file on disk – entry turns grey with "Missing" tooltip.
+### Build
+From the repository root:
 
-## Troubleshooting
-- **Permissions**: Ensure Eclipse can read/write the target files; external locations need filesystem access.
-- **Linked resources**: The view resolves workspace-linked files; if links break, entries show as missing until the resource is restored.
-- **Package Explorer missing**: If JDT is not installed, the handler falls back to the Project Explorer.
+```bash
+mvn -V -U -B clean verify
+```
 
-## Building Blocks
-- Plug-in bundle `com.holgersiegel.favorites`
-- Feature `com.holgersiegel.favorites.feature`
-- Update site `com.holgersiegel.favorites.updatesite`
+This creates the plug-in JAR in:
+
+- `com.holgersiegel.favorites/target/com.holgersiegel.favorites_*.jar`
+
+### Troubleshooting Build
+- Verify your runtime with `mvn -v` (Maven 3.8.6+ and Java 17+).
+- If dependency resolution is flaky, clear Tycho artifacts and retry:
+  `rm -rf ~/.m2/repository/org/eclipse/tycho && mvn -V -U -B clean verify`.
+
+### Install in Eclipse (Dropins)
+1. Close Eclipse.
+2. Copy `com.holgersiegel.favorites/target/com.holgersiegel.favorites_*.jar` to your Eclipse `dropins/` folder.
+3. Start Eclipse with `-clean` once.
+4. Open the view: `Window -> Show View -> Other... -> General -> Favorites`.
+
+### Remove/Update
+- Remove: delete the plug-in JAR from `dropins/` and restart Eclipse with `-clean`.
+- Update: replace the JAR in `dropins/` with a freshly built one and restart with `-clean`.
 
 ## License
-
-This project is licensed under the **Holger-NonCommercial-Personal-Work-License 1.0**.
-
-- Public use: free of charge, non-commercial only.  
-- Author’s exception: only Holger Siegel himself may use it in the course of his
-  employment at his current employer.  
-- No rights for colleagues, other employees, or the employer as a whole.  
-
-See [LICENSE](./LICENSE.md) for the full text
-
-
-
-
-
+MIT License. See [LICENSE.md](./LICENSE.md).

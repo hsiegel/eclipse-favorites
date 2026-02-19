@@ -11,16 +11,14 @@
     <name>Favorites Parent</name>
 
     <properties>
-        <tycho.version>5.0.0</tycho.version>
+        <tycho.version>3.0.5</tycho.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <modules>
         <module>com.holgersiegel.favorites</module>
-        <module>com.holgersiegel.favorites.feature</module>
-        <module>com.holgersiegel.favorites.updatesite</module>
     </modules>
 
     <repositories>
@@ -38,6 +36,29 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>enforce-toolchain-baseline</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireMavenVersion>
+                                    <version>[3.8.6,)</version>
+                                </requireMavenVersion>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.eclipse.tycho</groupId>
                 <artifactId>tycho-maven-plugin</artifactId>
@@ -71,7 +92,3 @@
         </plugins>
     </build>
 </project>
-
-
-
-

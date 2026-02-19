@@ -5,7 +5,7 @@ Bundle-SymbolicName: com.holgersiegel.favorites;singleton:=true
 Bundle-Version: 1.0.0.qualifier
 Bundle-Activator: com.holgersiegel.favorites.util.FavoritesPlugin
 Bundle-Vendor: Holger Siegel
-Bundle-RequiredExecutionEnvironment: JavaSE-21
+Bundle-RequiredExecutionEnvironment: JavaSE-17
 Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.ui,
  org.eclipse.jface,
@@ -17,4 +17,3 @@ Require-Bundle: org.eclipse.core.runtime,
  org.eclipse.jdt.ui,
  org.eclipse.swt
 Bundle-ActivationPolicy: lazy
-

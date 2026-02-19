@@ -1,10 +1,10 @@
 # com.holgersiegel.favorites
 
-Eclipse plug-in bundle providing the Favorites View. Built with Java 17 and Tycho; the bundle contributes the view, commands, handlers, and supporting model/persistence code.
+Eclipse plug-in bundle providing the Favorites View. Built with Java 17+ and Tycho; the bundle contributes the view, commands, handlers, and supporting model/persistence code.
 
 ## Contents
 - `plugin.xml` – view/command/menu registrations
-- `META-INF/MANIFEST.MF` – OSGi metadata (lazy activation, JavaSE-17)
+- `META-INF/MANIFEST.MF` – OSGi metadata (lazy activation, JavaSE-17 minimum)
 - `src/` – plug-in implementation (model, handlers, view, DnD, persistence)
 - `build.properties` – PDE build configuration
 

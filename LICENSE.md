@@ -1,30 +1,21 @@
-Holger-NonCommercial-Personal-Work-License 1.0
+MIT License
 
 Copyright (c) 2025 Holger Siegel
 
-1. Permission:
-   The author (Holger Siegel) grants the public a non-exclusive, royalty-free right
-   to use, modify, and distribute this work (source code, binaries, documentation),
-   but **only for non-commercial purposes**.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. Personal Work Exception:
-   Notwithstanding the non-commercial restriction above, the author himself
-   (Holger Siegel) is permitted to use this work in the course of his employment
-   with his current employer, even if such employment is compensated.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-   This exception applies **only** to the author personally.  
-   It does **not** extend to colleagues, other employees, or the employer as a whole.
-
-3. Restrictions:
-   - Any commercial use by third parties is prohibited without the explicit written
-     permission of the author.
-   - Resale, sublicensing, or distribution for commercial purposes is forbidden,
-     except by the author himself.
-
-4. Disclaimer:
-   This work is provided “as is,” without warranty of any kind. The author is not
-   liable for any damages arising from its use.
-
-5. Miscellaneous:
-   This license does not override any employment or intellectual property
-   agreements. If any provision is held invalid, the remainder shall still apply.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

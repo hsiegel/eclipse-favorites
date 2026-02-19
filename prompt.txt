@@ -1,1 +1,0 @@
-Baue in diesem Verzeichnis mein Eclipse-Plugin mit Maven, kopiere die Update-Site nach docs/ (inkl. .nojekyll), committe und pushe alle Änderungen nach main auf GitHub.
