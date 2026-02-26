@@ -10,6 +10,7 @@
               id="com.holgersiegel.favorites.views.FavoritesView"
               name="Favorites"
               class="com.holgersiegel.favorites.views.FavoritesView"
+              icon="icons/smiley.png"
               category="com.holgersiegel.favorites.views.category"
               allowMultiple="false"
               restorable="true"/>
@@ -133,4 +134,3 @@
           </menuContribution>
     </extension>
 </plugin>
-
