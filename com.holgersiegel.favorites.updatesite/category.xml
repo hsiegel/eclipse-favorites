@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+    <feature url="features/com.holgersiegel.favorites.feature_1.0.0.qualifier.jar"
+             id="com.holgersiegel.favorites.feature"
+             version="1.0.0.qualifier">
+        <category name="com.holgersiegel.favorites.category"/>
+    </feature>
+    <category-def name="com.holgersiegel.favorites.category" label="Favorites"/>
+</site>

@@ -19,6 +19,8 @@
 
     <modules>
         <module>com.holgersiegel.favorites</module>
+        <module>com.holgersiegel.favorites.feature</module>
+        <module>com.holgersiegel.favorites.updatesite</module>
     </modules>
 
     <repositories>
