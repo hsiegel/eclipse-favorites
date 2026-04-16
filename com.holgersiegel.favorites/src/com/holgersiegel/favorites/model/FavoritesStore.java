@@ -24,6 +24,7 @@
 package com.holgersiegel.favorites.model;
 
 import java.io.StringReader;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -105,31 +106,47 @@ public class FavoritesStore {
     }
 
     public synchronized boolean addResource(IResource resource) {
-        if (resource == null) {
-            return false;
-        }
-        FavoriteEntry entry = new FavoriteEntry(Resources.toAbsolutePath(resource), true, resource.getFullPath().toString(), resource.getName(), FavoriteEntry.Status.OK);
-        boolean added = internalAdd(entry, true);
-        if (added) {
-            refreshStatuses();
-            notifyListeners();
-        }
-        return added;
+        return addResourceInternal(resource).changed;
     }
 
-    public synchronized boolean addExternal(java.nio.file.Path path) {
-        if (path == null) {
-            return false;
+    public synchronized FavoriteEntry addOrGetResource(IResource resource) {
+        return addResourceInternal(resource).entry;
+    }
+
+    private AddOutcome addResourceInternal(IResource resource) {
+        if (resource == null) {
+            return AddOutcome.unchanged(null);
         }
-        java.nio.file.Path absolute = path.toAbsolutePath().normalize();
-        String name = absolute.getFileName() == null ? absolute.toString() : absolute.getFileName().toString();
-        FavoriteEntry entry = new FavoriteEntry(absolute.toString(), false, null, name, FavoriteEntry.Status.OK);
-        boolean added = internalAdd(entry, true);
-        if (added) {
+        FavoriteEntry entry = new FavoriteEntry(Resources.toAbsolutePath(resource), true, resource.getFullPath().toString(), resource.getName(), FavoriteEntry.Status.OK);
+        AddOutcome outcome = internalAdd(entry, true);
+        if (outcome.changed) {
             refreshStatuses();
             notifyListeners();
         }
-        return added;
+        return outcome;
+    }
+
+    public synchronized boolean addExternal(Path path) {
+        return addExternalInternal(path).changed;
+    }
+
+    public synchronized FavoriteEntry addOrGetExternal(Path path) {
+        return addExternalInternal(path).entry;
+    }
+
+    private AddOutcome addExternalInternal(Path path) {
+        if (path == null) {
+            return AddOutcome.unchanged(null);
+        }
+        Path absolute = path.toAbsolutePath().normalize();
+        String name = absolute.getFileName() == null ? absolute.toString() : absolute.getFileName().toString();
+        FavoriteEntry entry = new FavoriteEntry(absolute.toString(), false, null, name, FavoriteEntry.Status.OK);
+        AddOutcome outcome = internalAdd(entry, true);
+        if (outcome.changed) {
+            refreshStatuses();
+            notifyListeners();
+        }
+        return outcome;
     }
 
     public synchronized boolean addEntries(Collection<FavoriteEntry> toAdd) {
@@ -141,7 +158,7 @@ public class FavoritesStore {
             if (entry == null) {
                 continue;
             }
-            if (internalAdd(entry, true)) {
+            if (internalAdd(entry, true).changed) {
                 changed = true;
             }
         }
@@ -189,6 +206,32 @@ public class FavoritesStore {
             saveNow();
             notifyListeners();
         }
+    }
+
+    public synchronized int removeMissing() {
+        int removed = 0;
+        for (int i = entries.size() - 1; i >= 0; i--) {
+            FavoriteEntry entry = entries.get(i);
+            if (entry != null && entry.isMissing()) {
+                entries.remove(i);
+                entriesByKey.remove(entry.getKey());
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            saveNow();
+            notifyListeners();
+        }
+        return removed;
+    }
+
+    public synchronized boolean hasMissingEntries() {
+        for (FavoriteEntry entry : entries) {
+            if (entry != null && entry.isMissing()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public synchronized void move(List<FavoriteEntry> movingEntries, FavoriteEntry target, int location) {
@@ -244,31 +287,37 @@ public class FavoritesStore {
         ResourcesPlugin.getWorkspace().removeResourceChangeListener(resourceListener);
     }
 
-    private boolean internalAdd(FavoriteEntry entry, boolean persist) {
+    private AddOutcome internalAdd(FavoriteEntry entry, boolean persist) {
         if (entry == null || entry.getAbsolutePath() == null || entry.getAbsolutePath().isEmpty()) {
-            return false;
+            return AddOutcome.unchanged(null);
         }
         String key = entry.getKey();
         FavoriteEntry existing = entriesByKey.get(key);
         if (existing != null) {
+            boolean changed = false;
+            changed |= !Objects.equals(existing.getLabel(), entry.getLabel());
             existing.setLabel(entry.getLabel());
+            changed |= !Objects.equals(existing.getWorkspacePath(), entry.getWorkspacePath());
             existing.setWorkspacePath(entry.getWorkspacePath());
+            changed |= !Objects.equals(existing.getAbsolutePath(), entry.getAbsolutePath());
             existing.setAbsolutePath(entry.getAbsolutePath());
+            changed |= existing.getStatus() != entry.getStatus();
             existing.setStatus(entry.getStatus());
             if (entry.hasComment()) {
+                changed |= !Objects.equals(existing.getComment(), entry.getComment());
                 existing.setComment(entry.getComment());
             }
-            if (persist) {
+            if (persist && changed) {
                 saveNow();
             }
-            return false;
+            return changed ? AddOutcome.changed(existing) : AddOutcome.unchanged(existing);
         }
         entries.add(entry);
         entriesByKey.put(key, entry);
         if (persist) {
             saveNow();
         }
-        return true;
+        return AddOutcome.changed(entry);
     }
 
     private void resourceChanged(IResourceChangeEvent event) {
@@ -615,6 +664,25 @@ public class FavoritesStore {
                     throw new IllegalStateException("Failed to read favorites JSON", ex);
                 }
             }
+        }
+    }
+
+    private static final class AddOutcome {
+
+        private final FavoriteEntry entry;
+        private final boolean changed;
+
+        private AddOutcome(FavoriteEntry entry, boolean changed) {
+            this.entry = entry;
+            this.changed = changed;
+        }
+
+        static AddOutcome changed(FavoriteEntry entry) {
+            return new AddOutcome(entry, true);
+        }
+
+        static AddOutcome unchanged(FavoriteEntry entry) {
+            return new AddOutcome(entry, false);
         }
     }
 }

@@ -27,15 +27,22 @@ import java.net.URI;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
+import org.eclipse.core.runtime.preferences.IEclipsePreferences;
+import org.eclipse.core.runtime.preferences.InstanceScope;
 import org.eclipse.jface.action.Action;
 import org.eclipse.jface.action.IToolBarManager;
 import org.eclipse.jface.action.MenuManager;
@@ -59,6 +66,7 @@ import org.eclipse.jface.viewers.IDoubleClickListener;
 import org.eclipse.jface.viewers.ISelectionChangedListener;
 import org.eclipse.jface.viewers.IStructuredSelection;
 import org.eclipse.jface.viewers.ITreeContentProvider;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.Viewer;
 import org.eclipse.swt.SWT;
@@ -81,6 +89,7 @@ import org.eclipse.swt.widgets.Tree;
 import org.eclipse.swt.widgets.TreeColumn;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Menu;
+import org.eclipse.ui.plugin.AbstractUIPlugin;
 import org.eclipse.ui.IEditorInput;
 import org.eclipse.ui.IEditorPart;
 import org.eclipse.ui.IFileEditorInput;
@@ -114,6 +123,10 @@ public class FavoritesView extends ViewPart {
     private static final String OPEN_COMMAND_ID = "com.holgersiegel.favorites.commands.open";
     private static final String ADD_COMMAND_ID = "com.holgersiegel.favorites.commands.addCurrentEditor";
     private static final String REMOVE_COMMAND_ID = "com.holgersiegel.favorites.commands.removeSelected";
+    private static final String VIEW_ICON_PATH = "icons/smiley.png";
+    private static final String PREF_KEY_COMMENT_WIDTH = "favoritesView.commentWidth";
+    private static final String PREF_KEY_COMMENT_AUTO_WIDTH = "favoritesView.commentAutoWidth";
+    private static final int DEFAULT_COMMENT_WIDTH = 320;
 
     private TreeViewer viewer;
     private FavoritesLabelProvider labelProvider;
@@ -126,14 +139,21 @@ public class FavoritesView extends ViewPart {
     private boolean commentAutoWidth = true;
     private boolean adjustingCommentWidth;
     private static final int MIN_COMMENT_WIDTH = 200;
+    private int preferredCommentWidth = DEFAULT_COMMENT_WIDTH;
+    private boolean commentSettingsDirty;
     private ISelectionChangedListener handlerUpdateListener;
     private Action addToolbarAction;
     private Action removeToolbarAction;
+    private Action cleanMissingToolbarAction;
     private IEvaluationService evaluationService;
+    private IEclipsePreferences preferences;
+    private Image titleImage;
 
     @Override
     public void createPartControl(Composite parent) {
         store = FavoritesPlugin.getDefault().getFavoritesStore();
+        preferences = InstanceScope.INSTANCE.getNode(FavoritesPlugin.PLUGIN_ID);
+        configureTitleImage();
 
         Composite container = new Composite(parent, SWT.NONE);
         container.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true, true));
@@ -167,7 +187,7 @@ public class FavoritesView extends ViewPart {
 
     private void createColumns() {
         Tree tree = viewer.getTree();
-        commentAutoWidth = true;
+        loadCommentColumnSettings();
         adjustingCommentWidth = false;
         lastTreeWidth = -1;
         tree.setLinesVisible(true);
@@ -186,10 +206,12 @@ public class FavoritesView extends ViewPart {
         commentColumn.setText("Kommentar");
         commentColumn.setResizable(true);
         commentColumn.setMoveable(false);
-        setCommentColumnWidth(320);
+        setCommentColumnWidth(preferredCommentWidth);
         commentColumn.addListener(SWT.Resize, event -> {
             if (!adjustingCommentWidth) {
                 commentAutoWidth = false;
+                preferredCommentWidth = Math.max(MIN_COMMENT_WIDTH, commentColumn.getWidth());
+                saveCommentColumnSettings();
             }
         });
         commentViewerColumn.setLabelProvider(new CommentLabelProvider());
@@ -270,8 +292,9 @@ public class FavoritesView extends ViewPart {
             available = 0;
         }
         if (!commentAutoWidth) {
-            if (available < commentColumn.getWidth()) {
-                setCommentColumnWidth(available);
+            int targetWidth = available > 0 ? Math.min(preferredCommentWidth, available) : preferredCommentWidth;
+            if (Math.abs(targetWidth - commentColumn.getWidth()) > 2) {
+                setCommentColumnWidth(targetWidth);
             }
             return;
         }
@@ -297,6 +320,7 @@ public class FavoritesView extends ViewPart {
 
     @Override
     public void dispose() {
+        flushCommentColumnSettings();
         if (store != null && storeListener != null) {
             store.removeListener(storeListener);
         }
@@ -320,8 +344,14 @@ public class FavoritesView extends ViewPart {
         }
         addToolbarAction = null;
         removeToolbarAction = null;
+        cleanMissingToolbarAction = null;
         evaluationService = null;
         currentEditorKey = null;
+        preferences = null;
+        if (titleImage != null && !titleImage.isDisposed()) {
+            titleImage.dispose();
+            titleImage = null;
+        }
         super.dispose();
     }
 
@@ -341,6 +371,8 @@ public class FavoritesView extends ViewPart {
         var sharedImages = PlatformUI.getWorkbench().getSharedImages();
         ImageDescriptor addIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_OBJ_ADD);
         ImageDescriptor removeIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_TOOL_DELETE);
+        ImageDescriptor cleanIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_ELCL_REMOVEALL);
+        ImageDescriptor cleanDisabledIcon = sharedImages.getImageDescriptor(ISharedImages.IMG_ELCL_REMOVEALL_DISABLED);
         String addActionId = toolbarItemId(ADD_COMMAND_ID);
         toolBarManager.remove(addActionId);
         addToolbarAction = createCommandAction(addActionId, ADD_COMMAND_ID, "Add Current Editor", addIcon);
@@ -349,23 +381,36 @@ public class FavoritesView extends ViewPart {
         toolBarManager.remove(removeActionId);
         removeToolbarAction = createCommandAction(removeActionId, REMOVE_COMMAND_ID, "Remove", removeIcon);
         toolBarManager.add(removeToolbarAction);
+        String cleanMissingActionId = "com.holgersiegel.favorites.commands.removeMissing.toolbar";
+        toolBarManager.remove(cleanMissingActionId);
+        cleanMissingToolbarAction = createToolbarAction(cleanMissingActionId, "Clean Missing", cleanIcon, cleanDisabledIcon,
+                this::removeMissingEntries);
+        toolBarManager.add(cleanMissingToolbarAction);
         toolBarManager.update(true);
         actionBars.updateActionBars();
-        updateRemoveEnablement();
+        updateActionEnablement();
     }
 
     private Action createCommandAction(String itemId, String commandId, String label, ImageDescriptor icon) {
+        return createToolbarAction(itemId, label, icon, ImageDescriptor.createWithFlags(icon, SWT.IMAGE_DISABLE),
+                () -> executeCommand(commandId));
+    }
+
+    private Action createToolbarAction(String itemId, String label, ImageDescriptor icon, ImageDescriptor disabledIcon,
+            Runnable actionCallback) {
         Action action = new Action(label) {
             @Override
             public void run() {
-                executeCommand(commandId);
+                actionCallback.run();
             }
         };
         action.setId(itemId);
         action.setToolTipText(label);
         if (icon != null) {
             action.setImageDescriptor(icon);
-            action.setDisabledImageDescriptor(ImageDescriptor.createWithFlags(icon, SWT.IMAGE_DISABLE));
+        }
+        if (disabledIcon != null) {
+            action.setDisabledImageDescriptor(disabledIcon);
         }
         return action;
     }
@@ -398,9 +443,9 @@ public class FavoritesView extends ViewPart {
         if (handlerUpdateListener != null) {
             viewer.removeSelectionChangedListener(handlerUpdateListener);
         }
-        handlerUpdateListener = event -> updateRemoveEnablement();
+        handlerUpdateListener = event -> updateActionEnablement();
         viewer.addSelectionChangedListener(handlerUpdateListener);
-        updateRemoveEnablement();
+        updateActionEnablement();
     }
 
     private void hookEditorTracking() {
@@ -566,10 +611,13 @@ public class FavoritesView extends ViewPart {
         return entryKey != null && entryKey.equals(currentEditorKey);
     }
 
-    private void updateRemoveEnablement() {
+    private void updateActionEnablement() {
         boolean hasSelection = hasFavoriteSelection();
         if (removeToolbarAction != null) {
             removeToolbarAction.setEnabled(hasSelection);
+        }
+        if (cleanMissingToolbarAction != null) {
+            cleanMissingToolbarAction.setEnabled(store != null && store.hasMissingEntries());
         }
         if (evaluationService != null) {
             evaluationService.requestEvaluation(ISources.ACTIVE_CURRENT_SELECTION_NAME);
@@ -631,8 +679,93 @@ public class FavoritesView extends ViewPart {
                 return;
             }
             viewer.refresh();
-            updateRemoveEnablement();
+            updateActionEnablement();
         });
+    }
+
+    public void revealEntries(Collection<FavoriteEntry> entries) {
+        if (viewer == null || entries == null || entries.isEmpty()) {
+            return;
+        }
+        Control control = viewer.getControl();
+        if (control == null || control.isDisposed()) {
+            return;
+        }
+        Set<FavoriteEntry> uniqueEntries = new LinkedHashSet<>();
+        for (FavoriteEntry entry : entries) {
+            if (entry != null) {
+                uniqueEntries.add(entry);
+            }
+        }
+        if (uniqueEntries.isEmpty()) {
+            return;
+        }
+        List<FavoriteEntry> orderedEntries = new ArrayList<>(uniqueEntries);
+        control.getDisplay().asyncExec(() -> {
+            if (control.isDisposed()) {
+                return;
+            }
+            viewer.refresh();
+            viewer.setSelection(new StructuredSelection(orderedEntries), true);
+            updateActionEnablement();
+        });
+    }
+
+    private void configureTitleImage() {
+        ImageDescriptor descriptor = AbstractUIPlugin.imageDescriptorFromPlugin(FavoritesPlugin.PLUGIN_ID, VIEW_ICON_PATH);
+        if (descriptor == null) {
+            return;
+        }
+        Image newTitleImage = descriptor.createImage();
+        setTitleImage(newTitleImage);
+        if (titleImage != null && !titleImage.isDisposed()) {
+            titleImage.dispose();
+        }
+        titleImage = newTitleImage;
+    }
+
+    private void loadCommentColumnSettings() {
+        if (preferences == null) {
+            commentAutoWidth = true;
+            preferredCommentWidth = DEFAULT_COMMENT_WIDTH;
+            return;
+        }
+        commentAutoWidth = preferences.getBoolean(PREF_KEY_COMMENT_AUTO_WIDTH, true);
+        preferredCommentWidth = Math.max(MIN_COMMENT_WIDTH, preferences.getInt(PREF_KEY_COMMENT_WIDTH, DEFAULT_COMMENT_WIDTH));
+        commentSettingsDirty = false;
+    }
+
+    private void saveCommentColumnSettings() {
+        if (preferences == null) {
+            return;
+        }
+        preferences.putBoolean(PREF_KEY_COMMENT_AUTO_WIDTH, commentAutoWidth);
+        preferences.putInt(PREF_KEY_COMMENT_WIDTH, preferredCommentWidth);
+        commentSettingsDirty = true;
+    }
+
+    private void flushCommentColumnSettings() {
+        if (!commentSettingsDirty || preferences == null) {
+            return;
+        }
+        try {
+            preferences.flush();
+            commentSettingsDirty = false;
+        } catch (Exception ex) {
+            FavoritesPlugin plugin = FavoritesPlugin.getDefault();
+            if (plugin != null) {
+                plugin.getLog().log(new Status(IStatus.ERROR, FavoritesPlugin.PLUGIN_ID,
+                        "Failed to persist favorites view preferences", ex));
+            }
+        }
+    }
+
+    private void removeMissingEntries() {
+        if (store == null) {
+            return;
+        }
+        store.removeMissing();
+        updateActionEnablement();
     }
     private static final class FavoritesContentProvider implements ITreeContentProvider {
         @Override
@@ -857,6 +990,5 @@ public class FavoritesView extends ViewPart {
         }
     }
 }
-
 
 

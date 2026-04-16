@@ -26,20 +26,22 @@ package com.holgersiegel.favorites.dnd;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.Adapters;
 import org.eclipse.jface.util.LocalSelectionTransfer;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.viewers.StructuredSelection;
 import org.eclipse.jface.viewers.TreeViewer;
 import org.eclipse.jface.viewers.ViewerDropAdapter;
 import org.eclipse.swt.dnd.DND;
 import org.eclipse.swt.dnd.FileTransfer;
 import org.eclipse.swt.dnd.TransferData;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.part.ResourceTransfer;
 
 import com.holgersiegel.favorites.model.FavoriteEntry;
@@ -100,14 +102,17 @@ public class FavoritesDropAdapter extends ViewerDropAdapter {
         }
         IStructuredSelection structured = (IStructuredSelection) selection;
         List<FavoriteEntry> favorites = new ArrayList<>();
-        List<IResource> resources = new ArrayList<>();
+        Set<FavoriteEntry> resources = new LinkedHashSet<>();
         for (Object element : structured.toArray()) {
             if (element instanceof FavoriteEntry) {
                 favorites.add((FavoriteEntry) element);
             } else {
                 IResource resource = Adapters.adapt(element, IResource.class);
                 if (resource != null) {
-                    resources.add(resource);
+                    FavoriteEntry entry = store.addOrGetResource(resource);
+                    if (entry != null) {
+                        resources.add(entry);
+                    }
                 }
             }
         }
@@ -115,40 +120,45 @@ public class FavoritesDropAdapter extends ViewerDropAdapter {
             store.move(favorites, (FavoriteEntry) getCurrentTarget(), getCurrentLocation());
             return true;
         }
-        boolean changed = false;
-        for (IResource resource : resources) {
-            changed |= store.addResource(resource);
-        }
-        return changed;
+        revealEntries(resources);
+        return !resources.isEmpty();
     }
 
     private boolean handleResources(IResource[] resources) {
         if (resources == null) {
             return false;
         }
-        boolean changed = false;
+        Set<FavoriteEntry> added = new LinkedHashSet<>();
         for (IResource resource : resources) {
-            changed |= store.addResource(resource);
+            FavoriteEntry entry = store.addOrGetResource(resource);
+            if (entry != null) {
+                added.add(entry);
+            }
         }
-        return changed;
+        revealEntries(added);
+        return !added.isEmpty();
     }
 
     private boolean handleFileDrop(String[] filePaths) {
         if (filePaths == null) {
             return false;
         }
-        boolean changed = false;
+        Set<FavoriteEntry> added = new LinkedHashSet<>();
         for (String path : filePaths) {
             if (path == null || path.isBlank()) {
                 continue;
             }
             try {
-                changed |= store.addExternal(Paths.get(path));
+                FavoriteEntry entry = store.addOrGetExternal(Paths.get(path));
+                if (entry != null) {
+                    added.add(entry);
+                }
             } catch (InvalidPathException ex) {
                 // ignore invalid paths from the OS drop source
             }
         }
-        return changed;
+        revealEntries(added);
+        return !added.isEmpty();
     }
 
     private IResource[] asResourceArray(Object data) {
@@ -168,5 +178,22 @@ public class FavoritesDropAdapter extends ViewerDropAdapter {
     private TransferData getCurrentType() {
         return getCurrentEvent() != null ? getCurrentEvent().currentDataType : null;
     }
-}
 
+    private void revealEntries(Set<FavoriteEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return;
+        }
+        TreeViewer viewer = (TreeViewer) getViewer();
+        if (viewer == null || viewer.getControl() == null || viewer.getControl().isDisposed()) {
+            return;
+        }
+        List<FavoriteEntry> orderedEntries = new ArrayList<>(entries);
+        viewer.getControl().getDisplay().asyncExec(() -> {
+            if (viewer.getControl().isDisposed()) {
+                return;
+            }
+            viewer.refresh();
+            viewer.setSelection(new StructuredSelection(orderedEntries), true);
+        });
+    }
+}

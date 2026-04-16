@@ -43,8 +43,10 @@ import org.eclipse.ui.IWorkbenchPage;
 import org.eclipse.ui.IWorkbenchWindow;
 import org.eclipse.ui.handlers.HandlerUtil;
 
+import com.holgersiegel.favorites.model.FavoriteEntry;
 import com.holgersiegel.favorites.model.FavoritesStore;
 import com.holgersiegel.favorites.util.FavoritesPlugin;
+import com.holgersiegel.favorites.views.FavoritesView;
 
 public class AddCurrentEditorHandler extends AbstractHandler {
 
@@ -72,24 +74,33 @@ public class AddCurrentEditorHandler extends AbstractHandler {
         IEditorInput input = editor.getEditorInput();
         if (input instanceof IFileEditorInput) {
             IResource resource = ((IFileEditorInput) input).getFile();
-            store.addResource(resource);
+            revealInFavorites(page, store.addOrGetResource(resource));
             return null;
         }
         if (input instanceof IURIEditorInput) {
             URI uri = ((IURIEditorInput) input).getURI();
             if (uri != null && "file".equalsIgnoreCase(uri.getScheme())) {
                 Path path = Paths.get(uri);
-                store.addExternal(path);
+                revealInFavorites(page, store.addOrGetExternal(path));
                 return null;
             }
         }
         IResource resource = Adapters.adapt(input, IResource.class);
         if (resource != null) {
-            store.addResource(resource);
+            revealInFavorites(page, store.addOrGetResource(resource));
             return null;
         }
         showInfo(window.getShell(), "Der Editor stellt keine Datei bereit.");
         return null;
+    }
+
+    private void revealInFavorites(IWorkbenchPage page, FavoriteEntry entry) {
+        if (page == null || entry == null) {
+            return;
+        }
+        if (page.findView(FavoritesView.ID) instanceof FavoritesView favoritesView) {
+            favoritesView.revealEntries(java.util.List.of(entry));
+        }
     }
 
     private void showInfo(Shell shell, String message) {
